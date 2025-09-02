@@ -13,7 +13,7 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.preprocessing import StandardScaler, LabelEncoder, RobustScaler
 from sklearn.feature_selection import RFE, SelectFromModel
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Tuple, Optional, Any
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -177,18 +177,9 @@ class FixedEnergyConsumptionPredictor:
         df['estimated_households'] = df.apply(estimate_households_from_connections, axis=1)
         df['household_consumption'] = df['annual_consume'] / df['estimated_households']
         
-        # ===== TEMPORAL FEATURES (Year trends & decade indicators) =====
-        # Year trend variables (energy efficiency improvements over time)
-        df['year_trend'] = df['year'] - 2009  # Normalize to start from 0
-        df['year_squared'] = df['year_trend'] ** 2  # Non-linear time trends
-        
-        # Decade indicators (2010s vs late 2000s technology differences)
-        df['decade_2000s'] = (df['year'] <= 2010).astype(int)  # Early period
-        df['decade_2010s'] = (df['year'] > 2010).astype(int)   # Later period with better tech
-        
-        # Technology adoption era
-        df['early_smart_era'] = (df['year'] <= 2015).astype(int)  # Pre-smart meter widespread adoption
-        df['smart_era'] = (df['year'] > 2015).astype(int)         # Smart meter era
+        # ===== TEMPORAL FEATURES REMOVED =====
+        # Note: Year-based features removed to allow prediction on future data
+        # The model should not be biased toward specific training years
         
         # LOCATION FEATURES - Let the model learn location patterns itself
         # Use postal code first 2 digits for more granular location info
@@ -317,10 +308,6 @@ class FixedEnergyConsumptionPredictor:
     def get_feature_target_columns(self):
         """Define features with multicollinearity reduction and all enhancements."""
         feature_columns = [
-            # Temporal features (energy efficiency improvements over time)
-            'year_trend', 'year_squared', 'decade_2000s', 'decade_2010s',
-            'early_smart_era', 'smart_era',
-            
             # Weather features (reduced multicollinearity - removed temp_squared and heating_degree_days)
             'avg_temp', 'total_precipitation', 'total_sunshine_hours', 'avg_wind_speed',
             'cooling_degree_days', 'sunshine_ratio', 'heating_cooling_balance',
@@ -627,6 +614,138 @@ class FixedEnergyConsumptionPredictor:
         print(importance_df.head(10).to_string(index=False))
         
         return importance_df
+    
+    def predict_consumption(self, input_data: Dict[str, Any], target_column: str = 'household_consumption') -> Dict[str, Any]:
+        """
+        Make a prediction for new input data.
+        
+        Args:
+            input_data: Dictionary with feature values
+            target_column: Target variable to predict
+            
+        Returns:
+            Dictionary with prediction results
+        """
+        if target_column not in self.trained_models:
+            raise ValueError(f"No trained model found for {target_column}. Train the model first.")
+        
+        model_info = self.trained_models[target_column]
+        best_model = model_info['best_model']
+        best_model_name = model_info['best_model_name']
+        feature_columns = model_info['feature_columns']
+        use_scaled = model_info['results'][best_model_name]['use_scaled']
+        
+        # Create DataFrame from input
+        df_input = pd.DataFrame([input_data])
+        
+        # Feature engineering (same as training)
+        df_input = self._engineer_features(df_input)
+        
+        # Select only the features used in training
+        available_features = [col for col in feature_columns if col in df_input.columns]
+        missing_features = [col for col in feature_columns if col not in df_input.columns]
+        
+        if missing_features:
+            print(f"Warning: Missing features {missing_features}, using defaults")
+            # Fill missing features with defaults
+            for col in missing_features:
+                if col in ['postal_code_area', 'city_clean', 'company_clean', 'connection_type_clean', 
+                          'postal_province', 'household_size_category', 'connection_density_category', 
+                          'activity_level_category']:
+                    df_input[col] = 'default'
+                else:
+                    df_input[col] = 0
+        
+        X_input = df_input[feature_columns].copy()
+        
+        # Handle categorical features (same encoding as training)
+        categorical_cols = ['postal_code_area', 'city_clean', 'company_clean', 'connection_type_clean', 
+                           'postal_province', 'household_size_category', 'connection_density_category', 
+                           'activity_level_category']
+        
+        for col in categorical_cols:
+            if col in X_input.columns:
+                if hasattr(self, 'label_encoders') and col in self.label_encoders:
+                    try:
+                        X_input[col] = self.label_encoders[col].transform([str(X_input[col].iloc[0])])[0]
+                    except ValueError:
+                        # Handle unseen categories by using the most common encoded value (0)
+                        X_input[col] = 0
+                else:
+                    # If no encoder exists, convert to numeric
+                    X_input[col] = 0
+        
+        # Handle any remaining NaN values
+        X_input = X_input.fillna(0)
+        
+        # Apply same preprocessing as training
+        if use_scaled and hasattr(self, 'scaler') and hasattr(self, 'feature_selector'):
+            # Scale then select features
+            X_scaled = self.scaler.transform(X_input)
+            X_processed = self.feature_selector.transform(X_scaled)
+        elif hasattr(self, 'feature_selector'):
+            # Just select features
+            X_processed = self.feature_selector.transform(X_input)
+        else:
+            X_processed = X_input
+        
+        # Make prediction
+        prediction = best_model.predict(X_processed)[0]
+        
+        return {
+            'prediction_kwh': prediction,
+            'model_used': best_model_name,
+            'monthly_kwh': prediction / 12,
+            'daily_kwh': prediction / 365,
+            'estimated_monthly_cost': (prediction / 12) * 0.25,  # ~€0.25/kWh estimate
+        }
+    
+    def save_model(self, filepath: str, target_column: str = 'household_consumption'):
+        """
+        Save the trained model and all necessary components for production use.
+        
+        Args:
+            filepath: Path to save the model
+            target_column: Target variable that was trained
+        """
+        import pickle
+        
+        if target_column not in self.trained_models:
+            raise ValueError(f"No trained model found for {target_column}")
+        
+        model_info = self.trained_models[target_column]
+        
+        # Package everything needed for prediction
+        model_package = {
+            'model': model_info['best_model'],
+            'model_name': model_info['best_model_name'],
+            'feature_columns': model_info['feature_columns'],
+            'use_scaled': model_info['results'][model_info['best_model_name']]['use_scaled'],
+            'scaler': self.scaler if hasattr(self, 'scaler') else None,
+            'feature_selector': self.feature_selector if hasattr(self, 'feature_selector') else None,
+            'label_encoders': self.label_encoders if hasattr(self, 'label_encoders') else {},
+            'target_column': target_column,
+            'model_performance': {
+                'test_r2': model_info['results'][model_info['best_model_name']]['test_r2'],
+                'test_rmse': model_info['results'][model_info['best_model_name']]['test_rmse'],
+                'cv_r2_mean': model_info['results'][model_info['best_model_name']]['cv_r2_mean'],
+                'cv_r2_std': model_info['results'][model_info['best_model_name']]['cv_r2_std']
+            },
+            'training_metadata': {
+                'created_at': pd.Timestamp.now().isoformat(),
+                'target_column': target_column,
+                'feature_count': len(model_info['feature_columns']),
+                'selected_feature_count': len(self.feature_selector.get_support()) if hasattr(self, 'feature_selector') else len(model_info['feature_columns'])
+            }
+        }
+        
+        with open(filepath, 'wb') as f:
+            pickle.dump(model_package, f)
+        
+        print(f"\n💾 Model saved to: {filepath}")
+        print(f"   Model: {model_info['best_model_name']}")
+        print(f"   Performance: R² = {model_package['model_performance']['test_r2']:.3f}")
+        print(f"   Features: {model_package['training_metadata']['selected_feature_count']} selected from {model_package['training_metadata']['feature_count']}")
 
 
 def main():
@@ -640,7 +759,7 @@ def main():
     
     # Prepare data
     all_years = list(range(2009, 2021))
-    data = predictor.prepare_training_data("electricity", [2019,2020])
+    data = predictor.prepare_training_data("electricity", all_years)
     
     print(f"\n📊 Dataset Overview:")
     print(f"Training samples: {len(data):,}")
@@ -707,6 +826,9 @@ def main():
     print(f"RMSE: {best_rmse:.0f} kWh/household/year")
     print(f"Mean household consumption: {data['household_consumption'].mean():.0f} kWh/household/year")
     print(f"Relative error: {(best_rmse / data['household_consumption'].mean() * 100):.1f}%")
+    
+    # Save the trained model for production use
+    predictor.save_model('energy_consumption_model.pkl', target)
     
     print(f"\n✅ Success! Predicting household energy consumption with comprehensive feature engineering!")
     print(f"Note: Model estimates households from electrical connection patterns per building type.")

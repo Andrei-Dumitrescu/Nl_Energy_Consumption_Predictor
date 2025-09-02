@@ -141,6 +141,9 @@ models/
 checkpoints/
 saved_models/
 
+# Auto-generated trained models
+trained_model.pkl
+
 # Data files (add specific extensions as needed)
 *.csv
 *.tsv

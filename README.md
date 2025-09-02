@@ -190,21 +190,66 @@ importance = predictor.analyze_feature_importance('household_consumption')
 python example_ml_usage.py
 ```
 
+## Energy Prediction Tool
+
+### 🔧 **Unified Interface** - Interactive & Command Line
+```bash
+# Interactive mode (default) - comprehensive questionnaire
+python energy_predictor.py
+
+# Command-line mode - quick predictions
+python energy_predictor.py --house-type 3X25 --location 35 --weather normal
+
+# See all options
+python energy_predictor.py --help
+```
+
+### **Interactive Mode** 🏠
+Guided questionnaire with detailed inputs:
+- House type & electrical connection (1X25 to 3X50)
+- Location (postal code, city, energy company)
+- Neighborhood characteristics (urban/suburban/rural)
+- Connection details (activity %, smart meter status)
+- Weather scenario (cold/normal/warm year)
+- Prediction year (2020-2025)
+
+### **Command-Line Mode** ⚡
+Quick predictions with essential parameters:
+```bash
+# Basic usage with defaults (medium house, Utrecht, normal weather)
+python energy_predictor.py --house-type 3X25 --location 35 --weather normal
+
+# Large house in Amsterdam, cold year
+python energy_predictor.py --house-type 3X50 --location 10 --weather cold --year 2023
+
+# Small apartment without smart meter
+python energy_predictor.py --house-type 1X25 --location 20 --weather warm --no-smart-meter
+```
+
+**Parameters:**
+- `--house-type`: `1X25`, `1X35`, `3X25`, `3X35`, `3X50`
+- `--location`: First 2 digits of postal code (10=Amsterdam, 35=Utrecht, etc.)
+- `--weather`: `cold`, `normal`, `warm`
+- `--year`: 2020-2025
+- `--no-smart-meter`: Disable smart meter assumption
+
 ## Project Structure
 
 ```
 Nl_Energy_Consumption_Predictor/
-├── dataset.py              # Data infrastructure & integration
-├── model_training.py       # ML pipeline & prediction models
-├── example_ml_usage.py     # Quick ML demo
-├── requirements.txt        # Python dependencies
-├── .env.example           # Environment configuration template
-├── .gitignore            # Git ignore rules
-├── SECURITY.md           # Security policy
-├── LICENSE               # MIT license
-├── weather_cache/        # Cached KNMI weather data (gitignored)
-├── .github/              # GitHub workflows & dependabot config
-└── README.md             # Project documentation
+├── dataset.py                    # Data infrastructure & integration
+├── model_training.py             # ML pipeline & prediction models
+├── example_ml_usage.py           # Quick ML demo
+├── energy_predictor.py           # 🚀 Unified prediction tool (interactive + CLI)
+├── requirements.txt              # Python dependencies
+├── .env.example                 # Environment configuration template
+├── .gitignore                   # Git ignore rules
+├── SECURITY.md                  # Security policy
+├── LICENSE                      # MIT license
+├── trained_model.pkl            # Saved model (auto-generated)
+├── weather_cache/               # Cached KNMI weather data (gitignored)
+├── .github/                     # GitHub workflows & dependabot config
+└── README.md                    # Project documentation
 ```
 
 ## Data Sources
