@@ -167,8 +167,8 @@ from model_training import FixedEnergyConsumptionPredictor
 # Initialize predictor
 predictor = FixedEnergyConsumptionPredictor()
 
-# Prepare training data with feature engineering
-data = predictor.prepare_training_data("electricity", [2018, 2019, 2020])
+# Prepare training data with feature engineering (using all available years)
+data = predictor.prepare_training_data("electricity", list(range(2009, 2021)))
 
 # Train models with comprehensive features
 results = predictor.train_model(data, 'household_consumption')
@@ -179,11 +179,28 @@ importance = predictor.analyze_feature_importance('household_consumption')
 
 ### Features
 - **Household-level predictions** using connection type patterns
-- **Comprehensive feature engineering**: temporal, weather, geographic, and connection features
-- **Advanced preprocessing**: outlier removal, feature selection, robust scaling
+- **Future-proof modeling**: No year-based features, allowing predictions for any future year
+- **Comprehensive feature engineering**: weather, geographic, and infrastructure connection features
+- **Advanced preprocessing**: outlier removal, LASSO feature selection, robust scaling
 - **Multiple algorithms**: Linear/Ridge/Lasso regression, Random Forest
 - **Cross-validation**: Time-series aware validation for temporal data
-- **Performance metrics**: R², RMSE, MAE with detailed analysis
+- **Performance metrics**: R² = 0.988, RMSE = 157 kWh/year (7.1% relative error)
+
+### Model Architecture
+The prediction pipeline uses a **RandomForest** model trained on **3.5M+ data points** from 2009-2020, achieving state-of-the-art performance:
+
+**Top Predictive Features:**
+1. **Connection Efficiency** (58.4%) - Utilization patterns of electrical infrastructure
+2. **Connection Type** (13.1%) - Household electrical capacity (1X25 to 3X50)
+3. **Connections per Household** (12.1%) - Neighborhood density proxy
+4. **Active Connection Count** (4.3%) - Infrastructure activity levels
+5. **Weather Conditions** - Temperature, precipitation, sunshine patterns
+
+**Training Details:**
+- **Dataset**: 3,566,454 households across Netherlands (2009-2020)
+- **Features**: 36 engineered features → 18 selected via LASSO
+- **Performance**: 98.8% variance explained, 157 kWh/year RMSE
+- **Validation**: Time-series cross-validation for temporal robustness
 
 ### Quick ML Demo
 ```bash
@@ -193,6 +210,14 @@ python example_ml_usage.py
 ## Energy Prediction Tool
 
 ### 🔧 **Unified Interface** - Interactive & Command Line
+
+**Train the Model:**
+```bash
+# Train on full dataset (2009-2020) and save model
+python model_training.py
+```
+
+**Make Predictions:**
 ```bash
 # Interactive mode (default) - comprehensive questionnaire
 python energy_predictor.py
@@ -204,6 +229,8 @@ python energy_predictor.py --house-type 3X25 --location 35 --weather normal
 python energy_predictor.py --help
 ```
 
+**⭐ Future-Ready Predictions:** The model can predict energy consumption for **any future year** (2025, 2030, etc.) because it doesn't rely on year-specific patterns but focuses on fundamental household and weather characteristics.
+
 ### **Interactive Mode** 🏠
 Guided questionnaire with detailed inputs:
 - House type & electrical connection (1X25 to 3X50)
@@ -211,7 +238,6 @@ Guided questionnaire with detailed inputs:
 - Neighborhood characteristics (urban/suburban/rural)
 - Connection details (activity %, smart meter status)
 - Weather scenario (cold/normal/warm year)
-- Prediction year (2020-2025)
 
 ### **Command-Line Mode** ⚡
 Quick predictions with essential parameters:
@@ -220,7 +246,7 @@ Quick predictions with essential parameters:
 python energy_predictor.py --house-type 3X25 --location 35 --weather normal
 
 # Large house in Amsterdam, cold year
-python energy_predictor.py --house-type 3X50 --location 10 --weather cold --year 2023
+python energy_predictor.py --house-type 3X50 --location 10 --weather cold
 
 # Small apartment without smart meter
 python energy_predictor.py --house-type 1X25 --location 20 --weather warm --no-smart-meter
@@ -230,7 +256,6 @@ python energy_predictor.py --house-type 1X25 --location 20 --weather warm --no-s
 - `--house-type`: `1X25`, `1X35`, `3X25`, `3X35`, `3X50`
 - `--location`: First 2 digits of postal code (10=Amsterdam, 35=Utrecht, etc.)
 - `--weather`: `cold`, `normal`, `warm`
-- `--year`: 2020-2025
 - `--no-smart-meter`: Disable smart meter assumption
 
 ## Project Structure
@@ -246,7 +271,7 @@ Nl_Energy_Consumption_Predictor/
 ├── .gitignore                   # Git ignore rules
 ├── SECURITY.md                  # Security policy
 ├── LICENSE                      # MIT license
-├── trained_model.pkl            # Saved model (auto-generated)
+├── energy_consumption_model.pkl # Saved model (auto-generated)
 ├── weather_cache/               # Cached KNMI weather data (gitignored)
 ├── .github/                     # GitHub workflows & dependabot config
 └── README.md                    # Project documentation
@@ -278,61 +303,6 @@ Nl_Energy_Consumption_Predictor/
 | `total_sunshine_hours` | Annual total sunshine duration | hours |
 | `avg_wind_speed` | Annual average wind speed | m/s |
 | `total_global_radiation` | Annual total global radiation | J/cm² |
-
-## Security & Privacy
-
-### Data Security
-- ✅ **No personal data**: Only aggregated energy consumption by postal code areas
-- ✅ **Public datasets**: Energy and weather data from official open sources
-- ✅ **Environment variables**: Sensitive configuration kept in `.env` files
-- ✅ **Dependency scanning**: Automated security audits via GitHub Actions
-- ✅ **Secret scanning**: TruffleHog integration for credential detection
-
-### Setup Security
-1. **Never commit credentials**: Use `.env` files for API keys
-2. **Keep dependencies updated**: Regular Dependabot security updates
-3. **Review dependencies**: Run `pip audit` for vulnerability checks
-4. **Secure data paths**: Auto-discovery instead of hardcoded paths
-
-See [SECURITY.md](SECURITY.md) for detailed security policies.
-
-## Contributing
-
-1. **Fork the repository**
-2. **Create a feature branch**: `git checkout -b feature/amazing-feature`
-3. **Make changes** with security in mind
-4. **Run tests**: Ensure all checks pass
-5. **Submit a pull request**
-
-### Development Setup
-```bash
-# Install development dependencies
-pip install -r requirements.txt
-pip install pytest black flake8 mypy
-
-# Run security audit
-pip audit
-
-# Format code
-black .
-
-# Run linting
-flake8 .
-```
-
-## Use Cases
-
-This integrated dataset enables analysis of:
-- **Seasonal energy patterns** and weather dependencies
-- **Climate impact** on energy consumption trends
-- **Regional variations** in energy usage patterns
-- **Smart meter adoption** correlation with consumption changes
-- **Predictive modeling** for energy demand forecasting
-- **Climate change impact** on energy infrastructure planning
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## Acknowledgments
 

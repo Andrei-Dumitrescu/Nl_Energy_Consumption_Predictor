@@ -321,7 +321,7 @@ class EnergyPredictor:
             'zipcode_from': postal_code + '00',
             'city': 'Utrecht',
             'company': 'liander',
-            'num_connections': 200,
+            'num_connections': 30,
             'perc_of_active_connections': 88,
             'delivery_perc': 97.5,
             'smartmeter_perc': 75 if smart_meter else 25,
@@ -407,17 +407,28 @@ def get_interactive_inputs(predictor) -> Dict[str, Any]:
     
     # Location
     print("📍 Location:")
-    postal_input = input("Postal code (first 4 digits, e.g., 1012 for Amsterdam) [default: 3500 - Utrecht]: ").strip()
-    if postal_input and postal_input.isdigit() and len(postal_input) >= 2:
-        user_inputs['zipcode_from'] = postal_input[:4].ljust(4, '0')
-    else:
-        user_inputs['zipcode_from'] = '3500'
+    postal_input = input("Postal code (first 4 digits, e.g., 1012 for Amsterdam) [press Enter if unknown]: ").strip()
     
-    city_input = input("City name [default: Utrecht]: ").strip()
-    if city_input:
-        user_inputs['city'] = city_input.title()
+    if postal_input and postal_input.isdigit() and len(postal_input) >= 2:
+        # Valid postal code provided
+        user_inputs['zipcode_from'] = postal_input[:4].ljust(4, '0')
+        # Ask for city name when postal code is provided
+        city_input = input("City name [optional]: ").strip()
+        if city_input:
+            user_inputs['city'] = city_input.title()
+        else:
+            user_inputs['city'] = 'Utrecht'  # Neutral city name
     else:
-        user_inputs['city'] = 'Utrecht'
+        # No valid postal code provided, ask for city and use neutral postal code
+        city_input = input("City name [default: Utrecht]: ").strip()
+        if city_input:
+            user_inputs['city'] = city_input.title()
+        else:
+            user_inputs['city'] = 'Utrecht'
+        
+        # Use neutral postal code that represents central Netherlands (province: 'central')
+        user_inputs['zipcode_from'] = '3500'
+        print(f"   → Using neutral postal code: {user_inputs['zipcode_from']} (central Netherlands)")
     
     print()
     
@@ -436,14 +447,23 @@ def get_interactive_inputs(predictor) -> Dict[str, Any]:
     # Connection characteristics
     print("🏘️ Neighborhood & Connection Details:")
     
-    # Number of connections (typical for different areas)
-    density_input = input("Neighborhood density (urban/suburban/rural) [default: suburban]: ").strip().lower()
-    if density_input == 'urban':
-        user_inputs['num_connections'] = 500
-    elif density_input == 'rural':
-        user_inputs['num_connections'] = 50
+    # Number of connections (allow custom input or calculate from density)
+    connections_input = input("Number of connections in your area [press Enter to auto-calculate from density]: ").strip()
+    if connections_input and connections_input.isdigit():
+        user_inputs['num_connections'] = int(connections_input)
+        print(f"   → Using custom value: {user_inputs['num_connections']} connections")
     else:
-        user_inputs['num_connections'] = 200  # suburban default
+        # Auto-calculate from density
+        density_input = input("Neighborhood density (urban/suburban/rural) [default: suburban]: ").strip().lower()
+        if density_input == 'urban':
+            user_inputs['num_connections'] = 500
+        elif density_input == 'rural':
+            user_inputs['num_connections'] = 50
+        else:
+            user_inputs['num_connections'] = 30  # suburban default
+        
+        density_name = {'urban': 'Urban', 'rural': 'Rural'}.get(density_input, 'Suburban')
+        print(f"   → Auto-calculated from {density_name} density: {user_inputs['num_connections']} connections")
     
     # Activity percentage
     activity_input = input("Percentage of active connections (50-95%) [default: 88]: ").strip()
