@@ -233,6 +233,12 @@ local_settings.py
 *.log
 logs/
 
+# Test outputs
+.pytest_cache/
+htmlcov/
+.coverage
+test-results.xml
+
 # Output files
 output/
 results/

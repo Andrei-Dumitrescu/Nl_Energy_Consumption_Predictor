@@ -750,8 +750,8 @@ class FixedEnergyConsumptionPredictor:
 
 def main():
     """Demo the household consumption prediction with REGIONAL + WEATHER features."""
-    print("🏠 HOUSEHOLD ENERGY CONSUMPTION PREDICTOR")
-    print("🌍 REGIONAL + WEATHER Features (Testing Geographic Patterns)")
+    print("HOUSEHOLD ENERGY CONSUMPTION PREDICTOR")
+    print("REGIONAL + WEATHER Features (Testing Geographic Patterns)")
     print("=" * 60)
     
     # Initialize predictor
@@ -761,7 +761,7 @@ def main():
     all_years = list(range(2009, 2021))
     data = predictor.prepare_training_data("electricity", all_years)
     
-    print(f"\n📊 Dataset Overview:")
+    print(f"\nDataset Overview:")
     print(f"Training samples: {len(data):,}")
     print(f"Household consumption range: {data['household_consumption'].min():.0f} - {data['household_consumption'].max():.0f} kWh/household/year")
     print(f"Mean household consumption: {data['household_consumption'].mean():.0f} kWh/household/year")
@@ -769,18 +769,18 @@ def main():
     
     # Train enhanced models with all improvements
     print(f"\n{'='*60}")
-    print("🚀 COMPREHENSIVE ENHANCED PREDICTION MODEL")
-    print("✅ Temporal features (year trends, decade indicators)")
-    print("✅ Enhanced connection features (voltage, household categories)")
-    print("✅ NEW: Connection infrastructure features (total connections, activity %)")
-    print("✅ NEW: Connection density & utilization categories")
-    print("✅ NEW: Connection efficiency metrics")
-    print("✅ Smart meter adoption indicators")
-    print("✅ IQR-based outlier removal (connection-type specific)")
-    print("✅ RobustScaler (better for outliers)")
-    print("✅ LASSO feature selection (multicollinearity reduction)")
-    print("✅ GridSearchCV hyperparameter tuning")
-    print("✅ Time-series cross-validation")
+    print("COMPREHENSIVE ENHANCED PREDICTION MODEL")
+    print("- Temporal features (year trends, decade indicators)")
+    print("- Enhanced connection features (voltage, household categories)")
+    print("- NEW: Connection infrastructure features (total connections, activity %)")
+    print("- NEW: Connection density & utilization categories")
+    print("- NEW: Connection efficiency metrics")
+    print("- Smart meter adoption indicators")
+    print("- IQR-based outlier removal (connection-type specific)")
+    print("- RobustScaler (better for outliers)")
+    print("- LASSO feature selection (multicollinearity reduction)")
+    print("- GridSearchCV hyperparameter tuning")
+    print("- Time-series cross-validation")
     print('='*60)
     
     target = 'household_consumption'
@@ -788,7 +788,7 @@ def main():
     predictor.analyze_feature_importance(target)
     
     # Show sample predictions
-    print(f"\n📊 Sample Predictions vs Actual (Household Consumption):")
+    print(f"\nSample Predictions vs Actual (Household Consumption):")
     model_info = predictor.trained_models[target]
     X_test, y_test = model_info['test_data']
     best_model = model_info['best_model']
@@ -816,7 +816,7 @@ def main():
     
     print(comparison.round(1))
     
-    print(f"\n🎯 Model Performance:")
+    print(f"\nModel Performance:")
     best_model_name = max(results.keys(), key=lambda k: results[k]['test_r2'])
     best_r2 = results[best_model_name]['test_r2']
     best_rmse = results[best_model_name]['test_rmse']
@@ -830,7 +830,7 @@ def main():
     # Save the trained model for production use
     predictor.save_model('energy_consumption_model.pkl', target)
     
-    print(f"\n✅ Success! Predicting household energy consumption with comprehensive feature engineering!")
+    print(f"\nSuccess! Predicting household energy consumption with comprehensive feature engineering!")
     print(f"Note: Model estimates households from electrical connection patterns per building type.")
 
 if __name__ == "__main__":

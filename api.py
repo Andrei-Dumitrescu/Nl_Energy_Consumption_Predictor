@@ -6,16 +6,20 @@ Provides REST API endpoints for making energy consumption predictions.
 
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional, Dict, Any, List
 import uvicorn
-from energy_predictor import EnergyPredictor
-import logging
 from datetime import datetime
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+from energy_predictor import EnergyPredictor
+from config import (
+    HouseTypes, EnergyCompanies, WeatherScenarios, ModelConstants,
+    API_HOST, API_PORT, API_DEBUG
+)
+from logger_config import api_logger as logger
+from exceptions import ModelError, ValidationError, APIError
+
+# Logger is imported from logger_config
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -86,35 +90,36 @@ class PredictionRequest(BaseModel):
     # Weather scenario
     weather_scenario: str = Field("normal", description="Weather scenario for prediction")
     
-    @validator('house_type')
+    @field_validator('house_type')
+    @classmethod
     def validate_house_type(cls, v):
-        valid_types = ["1x25", "1x35", "3x25", "3x35", "3x50"]
-        if v not in valid_types:
-            raise ValueError(f"house_type must be one of {valid_types}")
+        if v not in HouseTypes.ALL:
+            raise ValueError(f"house_type must be one of {HouseTypes.ALL}")
         return v
     
-    
-    @validator('active_connections_pct')
+    @field_validator('active_connections_pct')
+    @classmethod
     def validate_active_connections(cls, v):
-        if not (50 <= v <= 95):
-            raise ValueError("active_connections_pct must be between 50 and 95")
+        if not (ModelConstants.ACTIVE_CONNECTIONS_MIN <= v <= ModelConstants.ACTIVE_CONNECTIONS_MAX):
+            raise ValueError(f"active_connections_pct must be between {ModelConstants.ACTIVE_CONNECTIONS_MIN} and {ModelConstants.ACTIVE_CONNECTIONS_MAX}")
         return v
     
-    @validator('energy_company')
+    @field_validator('energy_company')
+    @classmethod
     def validate_company(cls, v):
-        valid_companies = ['liander', 'enexis', 'stedin', 'westland-infra', 'coteq']
-        if v.lower() not in valid_companies:
-            raise ValueError(f"energy_company must be one of {valid_companies}")
+        if v.lower() not in EnergyCompanies.ALL:
+            raise ValueError(f"energy_company must be one of {EnergyCompanies.ALL}")
         return v.lower()
     
-    @validator('weather_scenario')
+    @field_validator('weather_scenario')
+    @classmethod
     def validate_weather(cls, v):
-        valid_weather = ["cold", "normal", "warm"]
-        if v.lower() not in valid_weather:
-            raise ValueError(f"weather_scenario must be one of {valid_weather}")
+        if v.lower() not in WeatherScenarios.ALL:
+            raise ValueError(f"weather_scenario must be one of {WeatherScenarios.ALL}")
         return v.lower()
     
-    @validator('postal_code')
+    @field_validator('postal_code')
+    @classmethod
     def validate_postal_code(cls, v):
         if v is not None:
             # Remove any spaces and validate format
@@ -174,9 +179,9 @@ async def get_model_info(predictor: EnergyPredictor = Depends(get_predictor)):
     return ModelInfo(
         model_loaded=predictor.model_package is not None,
         model_performance=predictor.model_package.get('model_performance', {}) if predictor.model_package else {},
-        available_house_types=["1x25", "1x35", "3x25", "3x35", "3x50"],
-        available_companies=['liander', 'enexis', 'stedin', 'westland-infra', 'coteq'],
-        available_weather_scenarios=["cold", "normal", "warm"]
+        available_house_types=HouseTypes.ALL,
+        available_companies=EnergyCompanies.ALL,
+        available_weather_scenarios=WeatherScenarios.ALL
     )
 
 @app.post("/predict", response_model=PredictionResponse, summary="Predict energy consumption", tags=["Prediction"])
@@ -195,7 +200,7 @@ async def predict_consumption(request: PredictionRequest, predictor: EnergyPredi
         results = predictor.predict(user_inputs)
         
         # Calculate comparison to average
-        typical_consumption = 2223  # Training data average
+        typical_consumption = ModelConstants.TYPICAL_DUTCH_HOUSEHOLD_KWH
         difference = results['prediction_kwh'] - typical_consumption
         percentage_diff = (difference / typical_consumption) * 100
         
@@ -234,10 +239,7 @@ def _convert_request_to_predictor_input(request: PredictionRequest) -> Dict[str,
         city = request.city if request.city else "Utrecht"
     
     # Auto-calculate circuits per household based on house type (same as CLI)
-    circuits_map = {
-        '1x25': 10, '1x35': 10, '3x25': 14, '3x35': 18, '3x50': 22
-    }
-    circuits = circuits_map.get(request.house_type, 14)
+    circuits = ModelConstants.CONNECTION_CIRCUITS_MAP.get(request.house_type, 14)
     
     # Handle number of connections (default to 30 if not provided)
     num_connections = request.num_connections if request.num_connections else 30
@@ -264,30 +266,7 @@ def _convert_request_to_predictor_input(request: PredictionRequest) -> Dict[str,
 
 def _get_weather_params(scenario: str) -> Dict[str, float]:
     """Get weather parameters for the given scenario."""
-    if scenario == 'cold':
-        return {
-            'avg_temp': 8.0,
-            'total_precipitation': 900,
-            'total_sunshine_hours': 1400,
-            'avg_wind_speed': 4.5,
-            'total_global_radiation': 3200,
-        }
-    elif scenario == 'warm':
-        return {
-            'avg_temp': 13.0,
-            'total_precipitation': 800,
-            'total_sunshine_hours': 1700,
-            'avg_wind_speed': 3.8,
-            'total_global_radiation': 3600,
-        }
-    else:  # normal
-        return {
-            'avg_temp': 10.5,
-            'total_precipitation': 850,
-            'total_sunshine_hours': 1580,
-            'avg_wind_speed': 4.2,
-            'total_global_radiation': 3400,
-        }
+    return ModelConstants.WEATHER_PARAMETERS.get(scenario, ModelConstants.WEATHER_PARAMETERS[WeatherScenarios.NORMAL])
 
 def _get_comparison_text(percentage_diff: float) -> str:
     """Get descriptive text for consumption comparison."""
@@ -306,8 +285,8 @@ if __name__ == "__main__":
     # Run the API server
     uvicorn.run(
         "api:app",
-        host="127.0.0.1",
-        port=8000,
-        reload=True,
+        host=API_HOST,
+        port=API_PORT,
+        reload=API_DEBUG,
         log_level="info"
     )

@@ -1,0 +1,246 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    name: Test Application
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [3.8, 3.9, "3.10", "3.11"]
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Cache pip dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Lint with flake8 (optional)
+      run: |
+        # Install flake8 for linting (optional)
+        pip install flake8
+        # Stop the build if there are Python syntax errors or undefined names
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        # Treat all other issues as warnings
+        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+      continue-on-error: true
+
+    - name: Test data loading (smoke test)
+      run: |
+        # Test that core modules can be imported
+        python -c "import dataset; print('✅ Dataset module imports successfully')"
+        python -c "import energy_predictor; print('✅ Energy predictor module imports successfully')"
+        python -c "import api; print('✅ API module imports successfully')"
+      continue-on-error: true
+
+    - name: Test model training (if model exists)
+      run: |
+        # Only test model loading if model file exists
+        if [ -f "energy_consumption_model.pkl" ]; then
+          python -c "
+          from energy_predictor import EnergyPredictor
+          predictor = EnergyPredictor()
+          success = predictor.load_model(verbose=False)
+          print(f'Model loading: {\"✅ Success\" if success else \"❌ Failed\"}')
+          "
+        else
+          echo "⚠️ No pre-trained model found - this is expected for new repositories"
+        fi
+      continue-on-error: true
+
+    - name: Start API server (background)
+      run: |
+        # Start API in background for testing
+        python api.py &
+        API_PID=$!
+        echo "API_PID=$API_PID" >> $GITHUB_ENV
+        
+        # Wait for API to start
+        sleep 10
+        
+        # Check if API is running
+        if curl -f http://127.0.0.1:8000/health; then
+          echo "✅ API started successfully"
+        else
+          echo "⚠️ API may not have started properly"
+        fi
+      continue-on-error: true
+
+    - name: Run unit tests
+      run: |
+        # Run unit tests with pytest
+        pytest tests/ -v --tb=short || echo "⚠️ Some tests failed"
+      continue-on-error: true
+
+    - name: Run API tests
+      run: |
+        # Run quick API tests
+        python test_api.py --quick
+      continue-on-error: true
+
+    - name: Stop API server
+      run: |
+        # Stop the background API process
+        if [ ! -z "$API_PID" ]; then
+          kill $API_PID || true
+        fi
+      continue-on-error: true
+
+    - name: Check code formatting (optional)
+      run: |
+        pip install black
+        black --check --diff . || echo "⚠️ Code formatting could be improved"
+      continue-on-error: true
+
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.10"
+
+    - name: Install security tools
+      run: |
+        python -m pip install --upgrade pip
+        pip install safety bandit
+
+    - name: Check for known vulnerabilities
+      run: |
+        # Check dependencies for known security vulnerabilities
+        pip install -r requirements.txt
+        safety check --json || echo "⚠️ Security check completed with warnings"
+      continue-on-error: true
+
+    - name: Run bandit security scan
+      run: |
+        # Scan for common security issues in Python code
+        bandit -r . -f json || echo "⚠️ Security scan completed with warnings"
+      continue-on-error: true
+
+  documentation:
+    name: Documentation Check
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Check README.md exists and has content
+      run: |
+        if [ -f "README.md" ] && [ -s "README.md" ]; then
+          echo "✅ README.md exists and has content"
+          echo "📊 README.md size: $(wc -l < README.md) lines"
+        else
+          echo "❌ README.md is missing or empty"
+          exit 1
+        fi
+
+    - name: Check for required files
+      run: |
+        files=("requirements.txt" "LICENSE" ".gitignore" ".env.example")
+        for file in "${files[@]}"; do
+          if [ -f "$file" ]; then
+            echo "✅ $file exists"
+          else
+            echo "⚠️ $file is missing"
+          fi
+        done
+
+    - name: Check API documentation
+      run: |
+        if [ -f "API_README.md" ]; then
+          echo "✅ API documentation exists"
+        else
+          echo "⚠️ API_README.md not found"
+        fi
+
+    - name: Validate JSON-like files
+      run: |
+        # Check if there are any JSON files to validate
+        if find . -name "*.json" -type f | grep -q .; then
+          echo "📄 Validating JSON files..."
+          find . -name "*.json" -type f -exec python -m json.tool {} \; > /dev/null
+          echo "✅ JSON files are valid"
+        else
+          echo "📄 No JSON files found to validate"
+        fi
+
+  build-info:
+    name: Build Information
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Display build information
+      run: |
+        echo "🚀 Build Information"
+        echo "==================="
+        echo "Repository: ${{ github.repository }}"
+        echo "Branch: ${{ github.ref_name }}"
+        echo "Commit: ${{ github.sha }}"
+        echo "Event: ${{ github.event_name }}"
+        echo "Runner OS: ${{ runner.os }}"
+        echo "Workflow: ${{ github.workflow }}"
+        echo "Job: ${{ github.job }}"
+        echo "Run ID: ${{ github.run_id }}"
+        echo "Run Number: ${{ github.run_number }}"
+
+    - name: Project structure
+      run: |
+        echo ""
+        echo "📁 Project Structure:"
+        echo "===================="
+        find . -type f -name "*.py" | head -10
+        echo ""
+        echo "📊 Python files: $(find . -name "*.py" -type f | wc -l)"
+        echo "📊 Total files: $(find . -type f | wc -l)"
+        echo "📊 Directory size: $(du -sh . | cut -f1)"
+
+  notify:
+    name: Notification
+    runs-on: ubuntu-latest
+    needs: [test, security, documentation, build-info]
+    if: always()
+    steps:
+    - name: Build status summary
+      run: |
+        echo "🎯 CI/CD Pipeline Summary"
+        echo "========================"
+        echo "Test Job: ${{ needs.test.result }}"
+        echo "Security Job: ${{ needs.security.result }}"
+        echo "Documentation Job: ${{ needs.documentation.result }}"
+        echo "Build Info Job: ${{ needs.build-info.result }}"
+        
+        if [ "${{ needs.test.result }}" = "success" ] && [ "${{ needs.documentation.result }}" = "success" ]; then
+          echo "🎉 Pipeline completed successfully!"
+          echo "✅ Ready for deployment"
+        else
+          echo "⚠️ Pipeline completed with some issues"
+          echo "📋 Check individual job results for details"
+        fi

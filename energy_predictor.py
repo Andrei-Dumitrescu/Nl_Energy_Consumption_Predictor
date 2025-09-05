@@ -60,7 +60,7 @@ class EnergyPredictor:
                 self.model_package = pickle.load(f)
             
             if verbose:
-                print(f"✅ Model loaded successfully!")
+                print(f"Model loaded successfully!")
                 print(f"   Model: {self.model_package['model_name']}")
                 print(f"   Performance: R² = {self.model_package['model_performance']['test_r2']:.3f}")
                 print(f"   Features: {self.model_package['training_metadata']['selected_feature_count']} selected")
@@ -371,7 +371,7 @@ class EnergyPredictor:
 
 def get_interactive_inputs(predictor) -> Dict[str, Any]:
     """Get user inputs through detailed interactive questionnaire."""
-    print("\n🏠 HOUSEHOLD ENERGY CONSUMPTION PREDICTOR")
+    print("\nHOUSEHOLD ENERGY CONSUMPTION PREDICTOR")
     print("=" * 50)
     print("Enter your household details (press Enter for defaults):")
     print()
@@ -433,7 +433,7 @@ def get_interactive_inputs(predictor) -> Dict[str, Any]:
     print()
     
     # Energy company
-    print("⚡ Energy Company:")
+    print("Energy Company:")
     companies = ['liander', 'enexis', 'stedin', 'westland-infra', 'coteq']
     print("Major companies: " + ", ".join([c.title() for c in companies]))
     company_input = input("Energy company [default: liander]: ").strip().lower()
@@ -557,10 +557,10 @@ def run_interactive_mode():
             
             # Display results
             print("\n" + "=" * 50)
-            print("🎯 ENERGY CONSUMPTION PREDICTION")
+            print("ENERGY CONSUMPTION PREDICTION")
             print("=" * 50)
             
-            print(f"📊 Predicted Annual Consumption: {results['prediction_kwh']:.0f} kWh")
+            print(f"Predicted Annual Consumption: {results['prediction_kwh']:.0f} kWh")
             print(f"📅 Monthly Average: {results['monthly_kwh']:.0f} kWh")
             print(f"📰 Daily Average: {results['daily_kwh']:.1f} kWh")
             print(f"💰 Estimated Monthly Cost: €{results['estimated_monthly_cost']:.0f}")
@@ -604,7 +604,7 @@ def run_command_line_mode(args):
     """Run command-line prediction mode."""
     predictor = EnergyPredictor()
     
-    print("⚡ Energy Consumption Prediction")
+    print("Energy Consumption Prediction")
     print("=" * 35)
     
     if not predictor.load_model(verbose=False):
@@ -621,11 +621,11 @@ def run_command_line_mode(args):
         
         results = predictor.predict(user_inputs)
         
-        print(f"\n🏠 House: {args.house_type} in area {args.location}")
+        print(f"\nHouse: {args.house_type} in area {args.location}")
         print(f"🌤️ Weather: {args.weather.title()} year")
         print(f"🔌 Smart meter: {'No' if args.no_smart_meter else 'Yes'}")
         print()
-        print(f"📊 Predicted: {results['prediction_kwh']:.0f} kWh/year")
+        print(f"Predicted: {results['prediction_kwh']:.0f} kWh/year")
         print(f"📅 Monthly: {results['monthly_kwh']:.0f} kWh")
         print(f"💰 Cost: €{results['estimated_monthly_cost']:.0f}/month")
         

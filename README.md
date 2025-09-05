@@ -1,6 +1,21 @@
-# Dutch Energy Consumption Predictor 🇳🇱⚡
+# Dutch Energy Consumption Predictor
+
+![Python](https://img.shields.io/badge/python-v3.8+-blue.svg)
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
+![Status](https://img.shields.io/badge/status-production--ready-green.svg)
+![ML](https://img.shields.io/badge/ML-scikit--learn-orange.svg)
+![API](https://img.shields.io/badge/API-FastAPI-009688.svg)
 
 An end-to-end machine learning pipeline for forecasting Dutch electricity & gas consumption patterns using comprehensive energy datasets combined with historical weather data from the Royal Netherlands Meteorological Institute (KNMI).
+
+## Key Results
+
+- **98.8% Accuracy** (R² = 0.988) on 3.5M+ household predictions
+- **157 kWh/year RMSE** (7.1% relative error on average consumption)
+- **Future-Proof**: Predicts energy consumption for any year (2025, 2030, etc.)
+- **Production-Ready**: FastAPI endpoint + interactive CLI tool
+- **Comprehensive**: 12 years of data (2009-2020) from 9 major Dutch energy companies
+- **Real-Time**: Weather data integration from 6 KNMI stations across Netherlands
 
 ## Dataset Overview
 
@@ -90,7 +105,7 @@ Initial correlation analysis reveals:
 - **Precipitation**: Minimal direct impact on consumption
 - **Seasonal patterns** captured through comprehensive weather variables
 
-## Getting Started
+## Quick Start
 
 ### Prerequisites
 
@@ -122,6 +137,32 @@ pip install pandas numpy scikit-learn requests kagglehub
    cp .env.example .env
    # Edit .env with your Kaggle API credentials if needed
    ```
+
+### Quick Demo (30 seconds)
+```bash
+# Train the model (first time only, ~2-3 minutes)
+python model_training.py
+
+# Make predictions interactively
+python energy_predictor.py
+
+# Or use command line
+python energy_predictor.py --house-type 3X25 --location 35 --weather normal
+
+# Start the API server
+python api.py
+# Then visit http://127.0.0.1:8000/docs for interactive API docs
+
+# For comprehensive demo with visualizations
+jupyter notebook demo.ipynb
+
+# For beautiful web interface
+python -m streamlit run streamlit_app.py
+# Then visit http://localhost:8501
+
+# For API testing
+python test_api.py
+```
 
 4. **Verify installation**:
    ```bash
@@ -155,6 +196,108 @@ This will:
 3. Create integrated dataset
 4. Show weather-energy correlations
 5. Demonstrate basic data loading
+
+## More Usage Examples
+
+### Batch Predictions
+```python
+# Process multiple households at once
+from energy_predictor import EnergyPredictor
+
+predictor = EnergyPredictor()
+predictor.load_model()
+
+households = [
+    {'zipcode_from': '1012', 'house_type': '3x25', 'city': 'Amsterdam'},
+    {'zipcode_from': '3500', 'house_type': '3x50', 'city': 'Utrecht'},
+    {'zipcode_from': '3011', 'house_type': '1x25', 'city': 'Rotterdam'},
+]
+
+for house in households:
+    result = predictor.predict(house)
+    print(f"{house['city']}: {result['prediction_kwh']:.0f} kWh/year")
+```
+
+### API Integration Examples
+```python
+import requests
+
+# Basic API call
+response = requests.post("http://127.0.0.1:8000/predict", json={
+    "postal_code": "1012",
+    "house_type": "3x25",
+    "weather_scenario": "normal"
+})
+
+if response.status_code == 200:
+    result = response.json()
+    print(f"Predicted: {result['prediction_kwh']:.0f} kWh/year")
+    print(f"Monthly cost: €{result['estimated_monthly_cost']:.0f}")
+```
+
+### Different Weather Scenarios
+```python
+# Compare energy usage across weather scenarios
+scenarios = ['cold', 'normal', 'warm']
+house_data = {'zipcode_from': '1012', 'house_type': '3x25'}
+
+for scenario in scenarios:
+    input_data = {**house_data, 'weather_scenario': scenario}
+    result = predictor.predict(input_data)
+    print(f"{scenario.title()} year: {result['prediction_kwh']:.0f} kWh")
+```
+
+## Multiple User Interfaces
+
+This project provides several ways to interact with the energy prediction model:
+
+### 🖥️ **Command Line Interface**
+```bash
+# Interactive mode with guided questionnaire
+python energy_predictor.py
+
+# Quick command-line predictions
+python energy_predictor.py --house-type 3X25 --location 35 --weather normal
+```
+
+### **Web Interface (Streamlit)**
+```bash
+python -m streamlit run streamlit_app.py
+# Visit: http://localhost:8501
+```
+- **Beautiful, interactive web app**
+- **Real-time predictions with visualizations**  
+- **User-friendly forms and charts**
+- **Prediction history and insights**
+
+### **REST API (FastAPI)**
+```bash
+python api.py
+# Visit: http://127.0.0.1:8000/docs
+```
+- **Production-ready API endpoints**
+- **Interactive API documentation**
+- **JSON request/response format**
+- **Integration ready for other applications**
+
+### 📓 **Jupyter Notebook Demo**
+```bash
+jupyter notebook demo.ipynb
+```
+- **Comprehensive technical demonstration**
+- **Data exploration and visualization**
+- **Model performance analysis**
+- **Feature importance insights**
+
+### 🧪 **API Testing**
+```bash
+python test_api.py              # Full test suite
+python test_api.py --quick      # Quick basic tests
+```
+- **Comprehensive API testing**
+- **Performance benchmarks**
+- **Input validation verification**
+- **Error handling tests**
 
 ## Machine Learning Pipeline
 
@@ -209,7 +352,7 @@ python example_ml_usage.py
 
 ## Energy Prediction Tool
 
-### 🔧 **Unified Interface** - Interactive & Command Line
+### **Unified Interface** - Interactive & Command Line
 
 **Train the Model:**
 ```bash
@@ -229,9 +372,9 @@ python energy_predictor.py --house-type 3X25 --location 35 --weather normal
 python energy_predictor.py --help
 ```
 
-**⭐ Future-Ready Predictions:** The model can predict energy consumption for **any future year** (2025, 2030, etc.) because it doesn't rely on year-specific patterns but focuses on fundamental household and weather characteristics.
+**Future-Ready Predictions:** The model can predict energy consumption for **any future year** (2025, 2030, etc.) because it doesn't rely on year-specific patterns but focuses on fundamental household and weather characteristics.
 
-### **Interactive Mode** 🏠
+### **Interactive Mode**
 Guided questionnaire with detailed inputs:
 - House type & electrical connection (1X25 to 3X50)
 - Location (postal code, city, energy company)
@@ -239,7 +382,7 @@ Guided questionnaire with detailed inputs:
 - Connection details (activity %, smart meter status)
 - Weather scenario (cold/normal/warm year)
 
-### **Command-Line Mode** ⚡
+### **Command-Line Mode**
 Quick predictions with essential parameters:
 ```bash
 # Basic usage with defaults (medium house, Utrecht, normal weather)
@@ -265,7 +408,7 @@ Nl_Energy_Consumption_Predictor/
 ├── dataset.py                    # Data infrastructure & integration
 ├── model_training.py             # ML pipeline & prediction models
 ├── example_ml_usage.py           # Quick ML demo
-├── energy_predictor.py           # 🚀 Unified prediction tool (interactive + CLI)
+├── energy_predictor.py           # Unified prediction tool (interactive + CLI)
 ├── requirements.txt              # Python dependencies
 ├── .env.example                 # Environment configuration template
 ├── .gitignore                   # Git ignore rules
