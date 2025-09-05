@@ -2,7 +2,7 @@
 
 ![Python](https://img.shields.io/badge/python-v3.8+-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![Status](https://img.shields.io/badge/status-production--ready-green.svg)
+![Status](https://img.shields.io/badge/status-deployment--ready-green)
 ![ML](https://img.shields.io/badge/ML-scikit--learn-orange.svg)
 ![API](https://img.shields.io/badge/API-FastAPI-009688.svg)
 
